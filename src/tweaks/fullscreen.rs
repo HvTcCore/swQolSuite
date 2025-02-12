@@ -54,8 +54,8 @@ impl Tweak for FullscreenTweak {
             // the MOV is flags for SetWindowLongW
             generate_aob_pattern![
                 _, 0x83, _, _, _,            // CMP (unimportant)
-                0x74, _,                     // JZ (unimportant)
-                0xbb, 0x00, 0x00, 0x00, 0x86 // MOV        EBX,10000110000000000000000000000000b
+                0x74, _,                     // JE (unimportant)
+                0xbb, 0x00, 0x00, 0x00, 0x86 // MOV        EBX,86000000
             ],
             // remove WS_POPUP flag
             (0x86000000 & !WS_POPUP.0).to_le_bytes().to_vec(),
@@ -78,5 +78,9 @@ impl Tweak for FullscreenTweak {
             .build()?;
 
         Ok(Self)
+    }
+    fn uninit(&mut self) -> anyhow::Result<()> {
+        self.reset_to_vanilla();
+        Ok(())
     }
 }
