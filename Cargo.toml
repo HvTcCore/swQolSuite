@@ -1,6 +1,6 @@
 [package]
 name = "swqols"
-version = "0.2.3-u.2"
+version = "0.2.3-u.3"
 repository = "https://github.com/HvTcCore/swQolSuite"
 authors = ["PieKing1215"]
 license = "MIT OR Apache-2.0"

@@ -67,8 +67,7 @@ impl Tweak for MultithreadedLoadingTweak {
 
             #[rustfmt::skip]
             let load_rom_fn_addr = builder.region.scan_aob_single(&generate_aob_pattern![
-                _, 0x89, 0x5c, _, 0x10,                  // MOV        qword ptr [RSP + 0x10],RBX
-                _, 0x89, 0x4c, _, 0x20,                  // MOV        qword ptr [RSP + 0x20],R9
+                0x40, 0x55,                              // PUSH       RBP
                 _,                                       // PUSH       _
                 _,                                       // PUSH       _
                 _,                                       // PUSH       _
@@ -76,8 +75,8 @@ impl Tweak for MultithreadedLoadingTweak {
                 _, _,                                    // PUSH       _
                 _, _,                                    // PUSH       _
                 _, _,                                    // PUSH       _
-                _, 0x8d, 0x6c, _, 0xd9,                  // LEA        RBP,[RSP + -0x27]
-                0x48, 0x81, 0xec, 0xa0, 0x00, 0x00, 0x00 // SUB        RSP,0xa0
+                _, 0x8d, 0x6c, _, 0xe1,                  // LEA        RBP,[RSP + -0x1f]
+                0x48, 0x81, 0xec, 0xf8, 0x00, 0x00, 0x00 // SUB        RSP,0xf8
             ]).context("Error finding load_rom fn addr")?;
 
             let det = GenericDetour::new(

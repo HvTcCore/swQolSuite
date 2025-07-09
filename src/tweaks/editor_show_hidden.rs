@@ -24,7 +24,7 @@ impl Tweak for ShowHiddenComponents {
         let injection_1 = builder.injection(
             // check for hidden flag
             generate_aob_pattern![
-                0x48, 0xa9, 0x00, 0x00, 0x00, 0x20, // TEST       EAX,0x20000000
+                0x48, 0xa9, 0x00, 0x00, 0x00, 0x20, // TEST       RAX,0x20000000
                 0x77, 0x67                          // JA
             ],
             // NOP the JA
@@ -38,8 +38,8 @@ impl Tweak for ShowHiddenComponents {
         let injection_2 = builder.injection(
             // check for hidden flag
             generate_aob_pattern![
-                0x48, 0x8b, 0x86, 0xa0, 0x02, 0x00, 0x00, // MOV        EAX,dword ptr [RSI + 0x2a0]
-                0x48, 0xa9, 0x00, 0x00, 0x00, 0x20        // TEST       EAX,0x20000000
+                0x48, 0x8b, 0x86, 0xb8, 0x02, 0x00, 0x00, // MOV        RAX,dword ptr [RSI + 0x2b8]
+                0x48, 0xa9, 0x00, 0x00, 0x00, 0x20        // TEST       RAX,0x20000000
             ],
             // replace 0x20000000 with 0x00000000 (so it'll always skip the JA after)
             vec![0x00, 0x00, 0x00, 0x00],
