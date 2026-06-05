@@ -18,6 +18,7 @@ pub mod editor_show_hidden;
 pub mod fast_loading_animations;
 pub mod fullscreen;
 pub mod map_lag;
+pub mod microcontroller_size;
 pub mod multithreaded_loading;
 pub mod settings;
 pub mod transform_edit;

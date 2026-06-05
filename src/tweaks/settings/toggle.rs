@@ -29,6 +29,7 @@ impl<'b, 'r> ToggleBuilder<'b, 'r> {
                 injections: vec![],
                 detours: vec![],
                 value_changed_listeners: vec![],
+                disabled_predicate: None,
             },
         }
     }
@@ -72,6 +73,13 @@ impl<'b, 'r> ToggleBuilder<'b, 'r> {
         self
     }
 
+    /// Grey out / disable the toggle when `predicate` returns `true`.
+    #[must_use]
+    pub fn disabled_when(mut self, predicate: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+        self.toggle.disabled_predicate = Some(Box::new(predicate));
+        self
+    }
+
     pub fn build(self) -> anyhow::Result<()> {
         self.tweak_builder
             .add_setting(Setting::new(self.toggle, self.defaults, self.config_key))
@@ -84,6 +92,7 @@ pub struct Toggle {
     injections: Vec<(Injection, bool)>,
     detours: Vec<(Box<dyn DetourUntyped + Send + Sync>, bool)>,
     value_changed_listeners: Vec<Box<dyn FnMut(bool) + Send + Sync>>,
+    disabled_predicate: Option<Box<dyn Fn() -> bool + Send + Sync>>,
 }
 
 impl SettingImpl<bool> for Toggle {
@@ -135,14 +144,25 @@ impl SettingImpl<bool> for Toggle {
         defaults: &Defaults<bool>,
         ui: &hudhook::imgui::Ui,
     ) -> anyhow::Result<()> {
-        if ui.checkbox(&self.label, value) {
-            self.set(*value)?;
-        }
+        let disabled = self
+            .disabled_predicate
+            .as_ref()
+            .is_some_and(|predicate| predicate());
+
+        let mut changed = false;
+        ui.disabled(disabled, || {
+            if ui.checkbox(&self.label, value) {
+                changed = true;
+            }
+        });
         if ui.is_item_hovered() {
             ui.tooltip_text(format!(
                 "{}(default: {}, vanilla: {})",
                 self.tooltip, defaults.default, defaults.vanilla
             ));
+        }
+        if changed {
+            self.set(*value)?;
         }
 
         Ok(())

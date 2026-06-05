@@ -11,7 +11,7 @@ use memory_rs::{
 };
 use retour::GenericDetour;
 
-use crate::types::{ComponentBase, FlipParent, GameStateEditor, Transform};
+use crate::types::{ComponentBase, GameStateEditor, Transform};
 
 use super::{Defaults, InjectAt, MemoryRegionExt, Tweak, TweakConfig};
 
@@ -21,17 +21,24 @@ const SHIFT_COPY_TRANSFORM_DEFAULTS: Defaults<bool> = Defaults::new(true, false)
 type UpdateQuaternionFn = extern "fastcall" fn(*mut Transform);
 type EditorDestructorFn = extern "fastcall" fn(*mut GameStateEditor, *mut ());
 type SetPlacingComponentFn = extern "fastcall" fn(*mut GameStateEditor, *mut ());
-type SetFlipFn = extern "fastcall" fn(*mut FlipParent, u8);
 
 static mut UPDATE_QUATERNION_FN: Option<UpdateQuaternionFn> = None;
 static mut EDITOR_DESTRUCTOR_FN: Option<EditorDestructorFn> = None;
 static mut SET_PLACING_COMPONENT_FN: Option<SetPlacingComponentFn> = None;
-static mut SET_FLIP_FN: Option<SetFlipFn> = None;
 
 static mut TRANSFORM: Option<*mut Transform> = None;
 static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 static FORCE_UPDATE_NEXT_TICK: AtomicBool = AtomicBool::new(false);
 static DISABLE_NEXT_TICK: AtomicBool = AtomicBool::new(false);
+
+// Matrix eyedropped via Shift+Ctrl+Click, applied to the placement in constant_render.
+static mut PENDING_MATRIX: [i32; 9] = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+static PENDING_APPLY: AtomicBool = AtomicBool::new(false);
+
+// Whether "Placement Transform Editing" is enabled. "Shift Copies Transform" depends
+// on it (it sets TRANSFORM and handles non-orthonormal matrices), so its toggle is
+// greyed out when this is off. Initialised to the Placement tweak's default.
+static PLACEMENT_EDITING_ENABLED: AtomicBool = AtomicBool::new(EDIT_TRANSFORM_DEFAULTS.default);
 
 pub struct TransformEditTweak {
     disable_quaternion_slerp: bool,
@@ -222,9 +229,9 @@ impl Tweak for TransformEditTweak {
 
         #[rustfmt::skip]
         let memory_pattern = generate_aob_pattern![
-            0x48, 0x8b, 0x51, 0x58,      // MOV        RDX,qword ptr [RDX + 0x58] on 1.13.1
+            0x48, 0x8b, 0x51, 0x58,      // MOV        RDX,qword ptr [RCX + 0x58]  (component is in RCX now)
             0x48, 0x8b, 0x12,            // MOV        RDX,qword ptr [RDX]
-            0x48, 0x8b, 0xce,            // MOV        RCX,RSI
+            0x48, 0x8b, 0xce,            // MOV        RCX,RSI                      (RSI = editor)
             0xe8, _, _, _, _,            // CALL       set_placing_component
             0x48, 0x8b, 0x4c, 0x24, 0x68 // MOV        RCX,qword ptr [RSP + 0x68]
         ];
@@ -234,12 +241,13 @@ impl Tweak for TransformEditTweak {
             .injection(
                 &memory_pattern,
                 {
-                    // CALL hook_ctrl_click
                     let mut inject = vec![
-                        0x48, 0x8b, 0xce,                               // MOV        RCX,RSI
-                        0xff, 0x15, 0x02, 0x00, 0x00, 0x00, 0xeb, 0x08, // start of long absolute JMP
+                        0x48, 0x8b, 0xd6, // MOV  RDX,RSI   (editor)
+                        0x48, 0xb8,       // MOV  RAX,imm64
                     ];
-                    inject.extend_from_slice(&(hook_ctrl_click as usize).to_le_bytes()); // JMP target
+                    inject.extend_from_slice(&(hook_ctrl_click as usize).to_le_bytes());
+                    inject.extend_from_slice(&[0xff, 0xd0]); // CALL RAX
+                    inject.extend_from_slice(&[0x48, 0x8b, 0x4c, 0x24, 0x68]); // MOV RCX,[RSP+0x68]
                     // pad with NOP
                     inject.resize(memory_pattern.size, 0x90);
                     inject
@@ -261,33 +269,13 @@ impl Tweak for TransformEditTweak {
             ));
         }
 
-        //builder
-        //    .toggle("Shift Copies Transform", SHIFT_COPY_TRANSFORM_DEFAULTS)
-        //    .tooltip("If enabled, holding Shift while using Ctrl+Click to eyedrop component will copy the component's transform.")
-        //    .config_key("shift_copies_transform")
-        //    .injection(hook_ctrl_click_injection, false)
-        //    .build()?;
-
-        // set_flip function
-        #[rustfmt::skip]
-        let memory_pattern = generate_aob_pattern![
-            0x48, 0x89, 0x5c, 0x24, 0x08,            // MOV        qword ptr [RSP + 0x8],RBX
-            0x48, 0x89, 0x6c, 0x24, 0x10,            // MOV        qword ptr [RSP + 0x10],RBP
-            0x48, 0x89, 0x74, 0x24, 0x18,            // MOV        qword ptr [RSP + 0x18],RSI
-            0x57,                                    // PUSH       RDI
-            0x41, 0x56,                              // PUSH       R14
-            0x41, 0x57,                              // PUSH       R15
-            0x48, 0x83, 0xec, 0x20,                  // SUB        RSP,0x20
-            0x0f, 0xb6, 0x81, 0xe8, 0x01, 0x00, 0x00 // MOVZX      EAX,byte ptr [RCX + 0x1e8]
-        ];
-        let set_flip_fn_addr = builder
-            .region
-            .scan_aob_single(&memory_pattern)
-            .context("Error finding set_flip addr")?;
-
-        unsafe {
-            SET_FLIP_FN = Some(std::mem::transmute::<usize, SetFlipFn>(set_flip_fn_addr));
-        }
+        builder
+            .toggle("Shift Copies Transform", SHIFT_COPY_TRANSFORM_DEFAULTS)
+            .tooltip("If enabled, holding Shift while using Ctrl+Click to eyedrop component will copy the component's transform.\nRequires Placement Transform Editing to be enabled.")
+            .config_key("shift_copies_transform")
+            .injection(hook_ctrl_click_injection, false)
+            .disabled_when(|| !PLACEMENT_EDITING_ENABLED.load(Ordering::Acquire))
+            .build()?;
 
         builder
             .toggle("Placement Transform Editing", EDIT_TRANSFORM_DEFAULTS)
@@ -296,6 +284,7 @@ impl Tweak for TransformEditTweak {
             .detour(update_quaternion_detour, false)
             .detour(editor_destructor_detour, false)
             .on_value_changed(|enabled| {
+                PLACEMENT_EDITING_ENABLED.store(enabled, Ordering::Release);
                 if !enabled {
                     FORCE_UPDATE_NEXT_TICK.store(true, Ordering::Release);
                     DISABLE_NEXT_TICK.store(true, Ordering::Release);
@@ -412,6 +401,31 @@ impl Tweak for TransformEditTweak {
             self.reset_transform();
         }
 
+        // Apply a matrix queued by a Shift+Ctrl+Click eyedrop, using the exact same
+        // path as the numpad editing above (which correctly handles non-orthonormal /
+        // stretched matrices). Only consume it once the placement transform exists.
+        if PENDING_APPLY.load(Ordering::Acquire) {
+            if let Some(tr) = unsafe { TRANSFORM } {
+                #[allow(clippy::cast_precision_loss)]
+                unsafe {
+                    let m = PENDING_MATRIX;
+                    (*tr).rotation_mat3i_cur = m;
+                    (*tr).rotation_mat3i_prev = m;
+                    self.check_orthonormal(&m);
+                    // Refresh the quaternion so the placement ghost shows the copied
+                    // rotation/mirror (the ghost's orientation is driven by it). This
+                    // orthonormalises rotation_mat3f_cur, so for a non-orthonormal
+                    // (stretched/mirrored) matrix restore it from the int matrix
+                    // afterwards - exactly like update_quaternion_hook does.
+                    Self::force_update_quaternion();
+                    if !is_orthonormal(&m) {
+                        (*tr).rotation_mat3f_cur = m.map(|i| i as _);
+                    }
+                }
+                PENDING_APPLY.store(false, Ordering::Release);
+            }
+        }
+
         if let Some(tr) = unsafe { TRANSFORM } {
             unsafe {
                 self.check_orthonormal(&(*tr).rotation_mat3i_cur);
@@ -517,14 +531,11 @@ extern "stdcall" fn hook_ctrl_click() {
     unsafe {
         let editor: *mut GameStateEditor;
         let component: *mut ComponentBase;
+        // The injection leaves the component in RCX and moves the editor into RDX.
         asm!(
-            // original
-            // "MOV        RDX,qword ptr [RDX + 0x58]", // don't want these lines since we want to have the reference to RDX before
-            // "MOV        RDX,qword ptr [RDX]",        // |
-            // "MOV        RCX,RSI",                    // handled outside
             "",
-            out("rcx") editor,
-            out("rdx") component,
+            out("rcx") component,
+            out("rdx") editor,
             options(nostack),
         );
 
@@ -534,56 +545,23 @@ extern "stdcall" fn hook_ctrl_click() {
             SET_PLACING_COMPONENT_FN.unwrap_unchecked();
         set_placing_component(editor, *component_type);
 
-        // if shift held, make eyedrop copy transform
-        let tr = &mut (*editor).place_transform;
+        // If shift is held, queue the eyedropped block's transform matrix. It gets
+        // applied to the placement in constant_render via the exact same path as
+        // Placement Transform Editing (which is known to handle non-standard /
+        // stretched matrices correctly), instead of poking the transform here where
+        // the game's update_quaternion would orthonormalise it back to a unit block.
         if SHIFT_HELD.load(Ordering::Acquire) {
-            let flip = ((*component).flip_type as usize + 0x40) as *mut u8;
-            let matrix = &mut (*component).matrix;
-            let ortho = is_orthonormal(&*matrix);
-            if ortho || TRANSFORM.is_some() {
-                tr.rotation_mat3i_cur = *matrix;
-                // (*tr).rotation_mat3i_prev = (*tr).rotation_mat3i_cur;
-                // (*tr).rotation_mat3f_cur = (*tr).rotation_mat3i_cur.map(|i| i as _);
-                // (*tr).rotation_mat3i_cur = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-            }
+            PENDING_MATRIX = (*component).matrix;
+            PENDING_APPLY.store(true, Ordering::Release);
 
-            if let Some(update_quaternion) = UPDATE_QUATERNION_FN {
-                update_quaternion(tr);
-            }
-
-            if let Some(set_flip) = SET_FLIP_FN {
-                let flip_parent = &mut (*editor).flip_parent;
-                let cur_flip = flip_parent.cur_flip;
-                set_flip(flip_parent, *flip);
-                if cur_flip & 0x1 != (*flip) & 0x1 {
-                    let unk_flip_type = (*editor).placing_flip_type as usize;
-                    (*editor).placing_flip_type = *((unk_flip_type
-                        + ((*((unk_flip_type + 0x40) as *mut u8) ^ 0x1) * 0x8) as usize)
-                        as *mut *mut ());
-                }
-                if cur_flip & 0x2 != (*flip) & 0x2 {
-                    let unk_flip_type = (*editor).placing_flip_type as usize;
-                    (*editor).placing_flip_type = *((unk_flip_type
-                        + ((*((unk_flip_type + 0x40) as *mut u8) ^ 0x2) * 0x8) as usize)
-                        as *mut *mut ());
-                }
-                if cur_flip & 0x4 != (*flip) & 0x4 {
-                    let unk_flip_type = (*editor).placing_flip_type as usize;
-                    (*editor).placing_flip_type = *((unk_flip_type
-                        + ((*((unk_flip_type + 0x40) as *mut u8) ^ 0x4) * 0x8) as usize)
-                        as *mut *mut ());
-                }
-            }
-
-            if !is_orthonormal(&*matrix) {
-                FORCE_UPDATE_NEXT_TICK.store(true, Ordering::Release);
-            }
+            // Mirror/flip isn't in the matrix - it's encoded as which "flip_type"
+            // variant the block uses (component +0x58, which differs for a mirrored
+            // block). Copy that variant into the placement (editor.placing_flip_type)
+            // so the ghost/placement is flipped to match.
+            (*editor).placing_flip_type = (*component).flip_type;
         }
 
-        asm!(
-            // original
-            "MOV        RCX,qword ptr [RSP + 0x28 + 0x8 + 0x8 + 0x8 + 0x8 + 0x8 + 0x68]",
-            options(nostack),
-        );
+        // RCX (= the component, used by the next game instruction) is restored by the
+        // injection after the call, so we don't touch the stack frame here.
     }
 }

@@ -25,6 +25,7 @@ use tweaks::editor_show_hidden::ShowHiddenComponents;
 use tweaks::fast_loading_animations::FastLoadingAnimationsTweak;
 use tweaks::fullscreen::FullscreenTweak;
 use tweaks::map_lag::MapLagTweak;
+use tweaks::microcontroller_size::MicrocontrollerSizeTweak;
 use tweaks::multithreaded_loading::MultithreadedLoadingTweak;
 use tweaks::transform_edit::TransformEditTweak;
 use tweaks::{Tweak, TweakConfig, TweakWrapper};
@@ -90,6 +91,7 @@ impl MainHud {
             Ok(process) => {
                 this.add_tweak::<EditorCameraSpeedTweak>(&process.region);
                 this.add_tweak::<EditorPlacementTweak>(&process.region);
+                this.add_tweak::<MicrocontrollerSizeTweak>(&process.region);
                 this.add_tweak::<ShowHiddenComponents>(&process.region);
                 this.add_tweak::<MapLagTweak>(&process.region);
                 this.add_tweak::<FastLoadingAnimationsTweak>(&process.region);

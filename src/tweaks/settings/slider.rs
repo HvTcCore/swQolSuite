@@ -49,6 +49,8 @@ impl<
                 tooltip: String::new(),
                 label: label.into(),
                 injections: vec![],
+                value_changed_listeners: vec![],
+                disabled_predicate: None,
             },
         }
     }
@@ -76,6 +78,19 @@ impl<
         self
     }
 
+    #[must_use]
+    pub fn on_value_changed(mut self, callback: impl FnMut(N) + Send + Sync + 'static) -> Self {
+        self.slider.value_changed_listeners.push(Box::new(callback));
+        self
+    }
+
+    /// Grey out / disable the slider when `predicate` returns `true`.
+    #[must_use]
+    pub fn disabled_when(mut self, predicate: impl Fn() -> bool + Send + Sync + 'static) -> Self {
+        self.slider.disabled_predicate = Some(Box::new(predicate));
+        self
+    }
+
     pub fn build(self) -> anyhow::Result<()> {
         self.tweak_builder
             .add_setting(Setting::new(self.slider, self.defaults, self.config_key))
@@ -88,6 +103,8 @@ pub struct Slider<N: ToBytes> {
     label: String,
     tooltip: String,
     injections: Vec<NumberInjection<N>>,
+    value_changed_listeners: Vec<Box<dyn FnMut(N) + Send + Sync>>,
+    disabled_predicate: Option<Box<dyn Fn() -> bool + Send + Sync>>,
 }
 
 impl<N: ToBytes + Copy + fmt::Display + imgui::internal::DataTypeKind> SettingImpl<N>
@@ -96,6 +113,10 @@ impl<N: ToBytes + Copy + fmt::Display + imgui::internal::DataTypeKind> SettingIm
     fn set(&mut self, value: N) -> anyhow::Result<()> {
         for injection in &mut self.injections {
             injection.inject(value);
+        }
+
+        for listener in &mut self.value_changed_listeners {
+            listener(value);
         }
 
         Ok(())
@@ -107,15 +128,26 @@ impl<N: ToBytes + Copy + fmt::Display + imgui::internal::DataTypeKind> SettingIm
         defaults: &Defaults<N>,
         ui: &imgui::Ui,
     ) -> anyhow::Result<()> {
-        ui.set_next_item_width(100.0);
-        if ui.slider(&self.label, self.min, self.max, value) {
-            self.set(*value)?;
-        }
+        let disabled = self
+            .disabled_predicate
+            .as_ref()
+            .is_some_and(|predicate| predicate());
+
+        let mut changed = false;
+        ui.disabled(disabled, || {
+            ui.set_next_item_width(100.0);
+            if ui.slider(&self.label, self.min, self.max, value) {
+                changed = true;
+            }
+        });
         if ui.is_item_hovered() {
             ui.tooltip_text(format!(
                 "{}(default: {}, vanilla: {})",
                 self.tooltip, defaults.default, defaults.vanilla
             ));
+        }
+        if changed {
+            self.set(*value)?;
         }
         Ok(())
     }

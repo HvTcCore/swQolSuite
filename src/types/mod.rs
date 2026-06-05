@@ -11,11 +11,11 @@ pub struct Transform {
 pub struct GameStateEditor {
     #[field_offset(0x1420)]
     pub place_transform: Transform,
-    #[field_offset(0x1578)]
-    pub placing_flip_type: *mut (),
     #[field_offset(0x1580)]
+    pub placing_flip_type: *mut (),
+    #[field_offset(0x1588)]
     pub flip_parent: FlipParent,
-    #[field_offset(0x26e8)]
+    #[field_offset(0x26f0)]
     pub dev_ui_visible: bool,
 }
 
