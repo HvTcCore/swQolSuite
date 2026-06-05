@@ -86,18 +86,22 @@ impl Tweak for MicrocontrollerSizeTweak {
                             WIDTH_SLIDER.store(w, Ordering::Relaxed);
                             LENGTH_SLIDER.store(l, Ordering::Relaxed);
 
-                            // When unlocked, force our configured range; otherwise
-                            // keep the sliders at the stock 1..6.
-                            let (min, max) = if UNLOCKED.load(Ordering::Relaxed) {
-                                (
-                                    MIN_SIZE.load(Ordering::Relaxed) as f32,
-                                    MAX_SIZE.load(Ordering::Relaxed) as f32,
-                                )
+                            // When unlocked use our configured range; otherwise the
+                            // stock 1..6.
+                            let (min, base_max) = if UNLOCKED.load(Ordering::Relaxed) {
+                                (MIN_SIZE.load(Ordering::Relaxed), MAX_SIZE.load(Ordering::Relaxed))
                             } else {
-                                (VANILLA_MIN, VANILLA_MAX)
+                                (1, 6) // stock 1..6
                             };
-                            set_bounds(w, min, max);
-                            set_bounds(l, min, max);
+
+                            // Never set the max below the microcontroller's current
+                            // width/length (mc +0x40 / +0x44), otherwise the slider would
+                            // clamp and shrink an already-larger microcontroller.
+                            let cur_w = (*((mc + 0x40) as *const i32)).clamp(1, 4096);
+                            let cur_l = (*((mc + 0x44) as *const i32)).clamp(1, 4096);
+
+                            set_bounds(w, min as f32, base_max.max(cur_w) as f32);
+                            set_bounds(l, min as f32, base_max.max(cur_l) as f32);
                         }
                     }
                     let orig = EDITOR_UPDATE_FN.unwrap_unchecked();
