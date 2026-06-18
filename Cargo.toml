@@ -1,6 +1,6 @@
 [package]
 name = "swqols"
-version = "0.2.3-u.5"
+version = "0.2.3-XG.1"
 repository = "https://github.com/HvTcCore/swQolSuite"
 authors = ["PieKing1215"]
 license = "MIT OR Apache-2.0"
@@ -30,3 +30,12 @@ figment = { version = "0.10", features = ["toml"] }
 toml = "0.8"
 serde = "1.0"
 memory-layout = "0.3"
+winapi = { version = "0.3", features = [
+    "winnt",
+    "errhandlingapi",
+    "processthreadsapi",
+    "handleapi",
+    "tlhelp32",
+    "sysinfoapi",
+    "minwindef",
+] }

@@ -27,6 +27,7 @@ use tweaks::fullscreen::FullscreenTweak;
 use tweaks::map_lag::MapLagTweak;
 use tweaks::microcontroller_size::MicrocontrollerSizeTweak;
 use tweaks::multithreaded_loading::MultithreadedLoadingTweak;
+use tweaks::property_editor::PropertyEditorTweak;
 use tweaks::transform_edit::TransformEditTweak;
 use tweaks::{Tweak, TweakConfig, TweakWrapper};
 use windows::Win32::Foundation::HINSTANCE;
@@ -92,6 +93,7 @@ impl MainHud {
                 this.add_tweak::<EditorCameraSpeedTweak>(&process.region);
                 this.add_tweak::<EditorPlacementTweak>(&process.region);
                 this.add_tweak::<MicrocontrollerSizeTweak>(&process.region);
+                this.add_tweak::<PropertyEditorTweak>(&process.region);
                 this.add_tweak::<ShowHiddenComponents>(&process.region);
                 this.add_tweak::<MapLagTweak>(&process.region);
                 this.add_tweak::<FastLoadingAnimationsTweak>(&process.region);
@@ -254,7 +256,7 @@ impl ImguiRenderLoop for MainHud {
                 }
             });
 
-        ui.window("Tweaks")
+        ui.window("Tweaks (Xenograft Branch)")
             .no_nav()
             .always_auto_resize(true)
             .resizable(false)

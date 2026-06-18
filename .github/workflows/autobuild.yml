@@ -2,7 +2,7 @@ name: Autobuild
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "xenograft" ]
 
   workflow_dispatch:
 
@@ -25,7 +25,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "swQolSuite-${{ steps.short-sha.outputs.sha }}"
+          name: "swQolSuite-XG-${{ steps.short-sha.outputs.sha }}"
           path: |
             target/x86_64-pc-windows-msvc/release/swqols-inject.exe
             target/x86_64-pc-windows-msvc/release/swqols.dll
