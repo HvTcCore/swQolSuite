@@ -17,7 +17,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/xenograft' }}
       
       - name: Build
         run: cargo build --release --verbose

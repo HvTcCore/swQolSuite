@@ -2,21 +2,24 @@
 
 A copy of the repository was created in case the original repository was deleted, as well as for the probable support of the program in a working state
 
-The original repository (archived) is located here:
-
-**https://github.com/PieKing1215/swQolSuite**
-
-# The original author's note on the termination of support for an indefinite period:
-
-### Development is on indefinite hiatus due to the new EULA
-
-More info: [The Future of swQolSuite](https://github.com/PieKing1215/swQolSuite/issues/4)
+### The original repository (archived) is located here: https://github.com/PieKing1215/swQolSuite
 
 # swQolSuite
 Mod for [Stormworks: Build and Rescue](https://store.steampowered.com/app/573090/Stormworks_Build_and_Rescue/) that adds some QOL settings.<br/>
 Only supports 64 bit Windows version (stormworks64.exe). It might work through wine/proton/etc, but untested.
+#### Check [`THIS`](https://github.com/HvTcCore/swQolSuite/wiki/HowTo-run-on-Linux-in-Steam) wiki page to see how to run on Linux in Steam:
 
 <img src="https://github.com/user-attachments/assets/cdff3e95-1c6f-4c14-9a02-fffd649d425f" style="width:40%" />
+
+
+## SWRIPE integrated xml functions
+This [[Xenograft](https://github.com/HvTcCore/swQolSuite/tree/xenograft)] branch created to test ported&integrated property xml functions from [SWRIPE](https://github.com/MaxPain09/Stormworks-Realtime-Illegal-Property-Editor) [Link to original repo].<br/>
+**!It can be more unstable than [[main](https://github.com/HvTcCore/swQolSuite/tree/main)] SwQolSuite branch, so use at your own risk!**<br/>
+Also this version required to tests, so be free to write in [issues](https://github.com/HvTcCore/swQolSuite/issues) with problems with it.<br/>
+### Original SWRIPE author github profile - https://github.com/MaxPain09<br/>
+
+<img width="322" height="583" alt="image" src="https://github.com/user-attachments/assets/a689975e-dfb8-479b-a960-ad291f38a24b" />
+
 
 ## READ THIS FIRST
 swQolSuite uses low level techniques (DLL injection + ASM manipulation) to patch the game since there's no other way to do it.<br/>
@@ -31,8 +34,8 @@ swQolSuite is not a cheating/griefing tool, please do not request features that 
 
 ## Download
 For releases, see [Releases](../../releases).<br/>
-For dev builds: sign in to GitHub, go [here](https://github.com/HvTcCore/swQolSuite/actions/workflows/autobuild.yml?query=branch%3Amain+is%3Asuccess), click the latest one, scroll down to "Artifacts" and download it.<br/>
-Or download the latest at https://nightly.link/HvTcCore/swQolSuite/workflows/autobuild/main<br/>
+For dev builds: sign in to GitHub, go [here](https://github.com/HvTcCore/swQolSuite/actions/workflows/autobuild.yml?query=branch%3Axenograft+is%3Asuccess), click the latest one, scroll down to "Artifacts" and download it.<br/>
+Or download the latest at https://nightly.link/HvTcCore/swQolSuite/workflows/autobuild/xenograft<br/>
 Unzip and run swqols-inject.exe to run.
 
 ## Basic Usage
